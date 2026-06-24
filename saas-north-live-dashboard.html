@@ -632,7 +632,7 @@ async function fetchCoupler() {
   const hdr = rows[0] || [];
   // Find column indices from header row
   const ci = (name) => hdr.findIndex(h => h && h.toLowerCase().includes(name.toLowerCase()));
-  const iCamp = 3, iSpend = 4, iCTR = 6, iCPC = 7, iCPM = 8, iClicks = 9;
+  const iCamp = 3, iSpend = 4, iSpendLocal = 5, iCTR = 6, iCPC = 7, iCPM = 8, iClicks = 9;
   const iFreq = 10, iImpr = 11, iReach = 12, iRegs = 14, iLeads = 15, iLP = 21;
   const cv = (row, i) => { const v = row[i]; return v ? parseFloat(v) || 0 : 0; };
   const dataRows = rows.slice(1).filter(r => r[iCamp] && r[iCamp].toLowerCase().includes('saas north'));
@@ -641,7 +641,9 @@ async function fetchCoupler() {
     const name = row[iCamp] || '';
     if (!camps[name]) camps[name] = {name,spend:0,impr:0,reach:0,clicks:0,lp:0,regs:0,leads:0,ctrW:0,cpmW:0,freqW:0,cpcW:0,iw:0,cw:0};
     const c = camps[name];
-    const sp=cv(row,iSpend), im=cv(row,iImpr), re=cv(row,iReach), cl=cv(row,iClicks);
+    // Use local currency (col 5) when available — covers CAD for LinkedIn
+    const sp = cv(row,iSpendLocal) || cv(row,iSpend);
+    const im=cv(row,iImpr), re=cv(row,iReach), cl=cv(row,iClicks);
     c.spend+=sp; c.impr+=im; c.reach+=re; c.clicks+=cl;
     c.lp+=cv(row,iLP); c.regs+=cv(row,iRegs); c.leads+=cv(row,iLeads);
     c.ctrW+=cv(row,iCTR)*im; c.cpmW+=cv(row,iCPM)*im; c.freqW+=cv(row,iFreq)*im; c.iw+=im;
@@ -967,8 +969,11 @@ async function init() {
     const gCamps = await fetchGoogle();
     for (const [k,c] of Object.entries(gCamps)) {
       const kl = k.toLowerCase();
-      if (kl.includes('youtube') || kl.includes('view')) D.yt   = {...c,name:k};
-      else if (kl.includes('pmax') || kl.includes('performance max')) D.pmax = {...c,name:k};
+      if (kl.includes('youtube') || kl.includes('view')) {
+        D.yt = {...c, name:k, spend:c.cost, impr:c.impr};
+      } else if (kl.includes('pmax') || kl.includes('performance max')) {
+        D.pmax = {...c, name:k, spend:c.cost, impr:c.impr};
+      }
     }
   } catch(e) {
     errors.push('Google Ads dump: '+e.message);
@@ -1077,12 +1082,12 @@ async function init() {
         tkSpend     = parseNum(cols[3]);
         totalRev    = parseNum(cols[6]);
         revTarget   = parseNum(cols[7]);
-        pctGoal     = parseNum(cols[8]);
+        pctGoal     = parseNum((cols[8]||'').replace('%',''));
         totalTickets= parseNum(cols[11]);
         paidTickets = parseNum(cols[12]);
         paidROAS    = parseNum(cols[15]);
         paidRev     = parseNum(cols[14]);
-        pctSales    = parseNum(cols[16]);
+        pctSales    = parseNum((cols[16]||'').replace('%',''));
         cpl         = parseNum(cols[19]);
       }
       if (name === 'SAAS North Demand Gen 2026') {
